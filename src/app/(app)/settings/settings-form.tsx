@@ -1,0 +1,131 @@
+'use client'
+
+import { useState } from 'react'
+import { useRouter } from 'next/navigation'
+import { Loader2, CheckCircle2 } from 'lucide-react'
+
+type Initial = {
+  name: string
+  legalName: string | null
+  address: string | null
+  phone: string | null
+  email: string | null
+  website: string | null
+  vatNumber: string | null
+  registrationNumber: string | null
+  taxRate: number
+  bankName: string | null
+  bankBranch: string | null
+  bankAccountName: string | null
+  bankAccountNumber: string | null
+}
+
+export function SettingsForm({ initial }: { initial: Initial }) {
+  const router = useRouter()
+  const [form, setForm] = useState({
+    name: initial.name,
+    legalName: initial.legalName ?? '',
+    address: initial.address ?? '',
+    phone: initial.phone ?? '',
+    email: initial.email ?? '',
+    website: initial.website ?? '',
+    vatNumber: initial.vatNumber ?? '',
+    registrationNumber: initial.registrationNumber ?? '',
+    taxRate: String(initial.taxRate),
+    bankName: initial.bankName ?? '',
+    bankBranch: initial.bankBranch ?? '',
+    bankAccountName: initial.bankAccountName ?? '',
+    bankAccountNumber: initial.bankAccountNumber ?? '',
+  })
+  const [saving, setSaving] = useState(false)
+  const [saved, setSaved] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  async function submit(e: React.FormEvent) {
+    e.preventDefault()
+    setError(null)
+    setSaved(false)
+    setSaving(true)
+    const res = await fetch('/api/settings', {
+      method: 'PUT',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ ...form, taxRate: Number(form.taxRate) }),
+    })
+    setSaving(false)
+    if (!res.ok) {
+      const { error: msg } = await res.json().catch(() => ({ error: 'Failed to save' }))
+      return setError(msg)
+    }
+    setSaved(true)
+    router.refresh()
+  }
+
+  const fields: { key: keyof typeof form; label: string; type?: string; span?: number }[] = [
+    { key: 'name', label: 'Display name', span: 2 },
+    { key: 'legalName', label: 'Legal name', span: 2 },
+    { key: 'address', label: 'Address', span: 2 },
+    { key: 'phone', label: 'Phone' },
+    { key: 'email', label: 'Email', type: 'email' },
+    { key: 'website', label: 'Website' },
+    { key: 'vatNumber', label: 'VAT number' },
+    { key: 'registrationNumber', label: 'Registration #' },
+    { key: 'taxRate', label: 'Default VAT %', type: 'number' },
+  ]
+
+  const banking: { key: keyof typeof form; label: string }[] = [
+    { key: 'bankName', label: 'Bank' },
+    { key: 'bankBranch', label: 'Branch' },
+    { key: 'bankAccountName', label: 'Account name' },
+    { key: 'bankAccountNumber', label: 'Account number' },
+  ]
+
+  return (
+    <form onSubmit={submit} className="space-y-6">
+      {error && <div className="rounded-lg border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-700">{error}</div>}
+      {saved && (
+        <div className="rounded-lg border border-emerald-300 bg-emerald-50 px-3 py-2 text-sm text-emerald-700 flex items-center gap-2">
+          <CheckCircle2 className="h-4 w-4" /> Settings saved.
+        </div>
+      )}
+
+      <div className="bp-card p-6">
+        <h2 className="font-bold mb-4">Company details</h2>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          {fields.map((f) => (
+            <div key={f.key} className={f.span === 2 ? 'md:col-span-2' : ''}>
+              <label className="bp-label mb-1 block">{f.label}</label>
+              <input
+                type={f.type ?? 'text'}
+                value={form[f.key]}
+                onChange={(e) => setForm({ ...form, [f.key]: e.target.value })}
+                className="bp-input"
+              />
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div className="bp-card p-6">
+        <h2 className="font-bold mb-4">Banking (printed on invoices)</h2>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          {banking.map((f) => (
+            <div key={f.key}>
+              <label className="bp-label mb-1 block">{f.label}</label>
+              <input
+                value={form[f.key]}
+                onChange={(e) => setForm({ ...form, [f.key]: e.target.value })}
+                className="bp-input"
+              />
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div className="flex justify-end">
+        <button type="submit" disabled={saving} className="bp-btn-primary">
+          {saving && <Loader2 className="h-4 w-4 animate-spin" />} Save settings
+        </button>
+      </div>
+    </form>
+  )
+}

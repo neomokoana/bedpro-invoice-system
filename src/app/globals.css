@@ -1,0 +1,65 @@
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;0,9..40,800&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --bedpro-red: #E8191A;
+  --bedpro-black: #111111;
+  --bedpro-bg: #F6F6F6;
+}
+
+html, body {
+  margin: 0;
+  font-family: 'DM Sans', system-ui, sans-serif;
+  background: var(--bedpro-bg);
+  color: #111;
+  -webkit-font-smoothing: antialiased;
+}
+
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #e0e0e0; border-radius: 3px; }
+
+@layer components {
+  .bp-logo { @apply font-extrabold tracking-tight leading-none; }
+  .bp-logo-bed { color: var(--bedpro-red); }
+  .bp-logo-pro { color: var(--bedpro-black); }
+
+  .bp-card { @apply bg-white rounded-card border border-[#f0f0f0] shadow-card; }
+  .bp-input {
+    @apply w-full rounded-lg border border-[#e0e0e0] px-3 py-2 text-sm
+           focus:outline-none focus:ring-2 focus:ring-[#E8191A]/30 focus:border-[#E8191A]
+           disabled:bg-gray-50 disabled:cursor-not-allowed;
+  }
+  .bp-label { @apply text-xs font-bold text-gray-500 uppercase tracking-wide; }
+  .bp-btn {
+    @apply inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-bold
+           transition disabled:opacity-60 disabled:cursor-not-allowed;
+  }
+  .bp-btn-primary { @apply bp-btn bg-[#E8191A] text-white hover:bg-[#cf1314]; }
+  .bp-btn-dark    { @apply bp-btn bg-[#111] text-white hover:bg-[#000]; }
+  .bp-btn-outline { @apply bp-btn bg-white text-gray-700 border border-[#e0e0e0] hover:bg-gray-50; }
+  .bp-btn-ghost   { @apply bp-btn text-gray-600 hover:bg-gray-100; }
+  .bp-btn-success { @apply bp-btn bg-emerald-600 text-white hover:bg-emerald-700; }
+  .bp-btn-danger  { @apply bp-btn bg-red-600 text-white hover:bg-red-700; }
+
+  .bp-table       { @apply w-full text-sm; }
+  .bp-table thead { @apply bg-[#111] text-white; }
+  .bp-table th    { @apply px-4 py-3 text-left text-[10px] font-bold uppercase tracking-wider; }
+  .bp-table td    { @apply px-4 py-3 border-b border-gray-100; }
+  .bp-table tr:hover td { @apply bg-gray-50; }
+
+  .bp-badge       { @apply inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold; }
+  .bp-badge-paid    { @apply bp-badge bg-emerald-100 text-emerald-700 border border-emerald-300; }
+  .bp-badge-unpaid  { @apply bp-badge bg-yellow-100 text-yellow-700 border border-yellow-300; }
+  .bp-badge-sent    { @apply bp-badge bg-blue-100 text-blue-700 border border-blue-300; }
+  .bp-badge-draft   { @apply bp-badge bg-slate-100 text-slate-600 border border-slate-300; }
+  .bp-badge-overdue { @apply bp-badge bg-red-100 text-red-700 border border-red-300; }
+}
+
+@media print {
+  body { padding: 30px 40px; background: #fff; }
+  .no-print { display: none !important; }
+}

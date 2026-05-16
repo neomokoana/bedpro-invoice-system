@@ -1,0 +1,23 @@
+import { prisma } from '@/lib/prisma'
+import { InvoiceForm } from '../invoice-form'
+
+export const dynamic = 'force-dynamic'
+
+export default async function NewInvoicePage() {
+  const [customers, products, settings] = await Promise.all([
+    prisma.customer.findMany({ where: { isActive: true }, orderBy: { name: 'asc' } }),
+    prisma.product.findMany({ where: { isActive: true }, orderBy: { name: 'asc' } }),
+    prisma.companySettings.findUnique({ where: { id: 'singleton' } }),
+  ])
+
+  return (
+    <div className="max-w-5xl">
+      <h1 className="text-2xl font-extrabold mb-6">New Invoice</h1>
+      <InvoiceForm
+        customers={customers.map((c) => ({ id: c.id, name: c.name, company: c.company }))}
+        products={products.map((p) => ({ id: p.id, name: p.name, unitPrice: Number(p.unitPrice) }))}
+        defaultTaxRate={Number(settings?.taxRate ?? 15)}
+      />
+    </div>
+  )
+}
