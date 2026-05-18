@@ -68,7 +68,7 @@ export function Sidebar({
   return (
     <aside className="w-56 bg-[#111] text-white flex flex-col flex-shrink-0">
       <div className="px-5 pt-7 pb-4">
-        <BedProLogo size={26} src={logoUrl} />
+        <BedProLogo size={26} src={logoUrl} variant="light" />
         <div className="mt-1 text-[11px] text-gray-500 tracking-wider">INVOICE MANAGER</div>
       </div>
       <div className="border-t border-[#1a1a1a] mx-5 mb-2" />

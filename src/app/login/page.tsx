@@ -29,7 +29,7 @@ export default async function LoginPage({
   return (
     <div className="min-h-screen grid lg:grid-cols-2 bg-[#F6F6F6]">
       <div className="hidden lg:flex flex-col justify-between bg-[#111] text-white p-12">
-        <BedProLogo size={36} src={logoUrl} />
+        <BedProLogo size={36} src={logoUrl} variant="light" />
         <div>
           <h1 className="text-4xl font-extrabold leading-tight">
             Invoice & receipt management
