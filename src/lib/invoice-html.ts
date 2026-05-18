@@ -17,6 +17,19 @@ function escape(s: string | null | undefined): string {
     .replace(/"/g, '&quot;')
 }
 
+/**
+ * Header logo. If CompanySettings.logoUrl is set we use that image (Puppeteer
+ * will fetch it during rendering — must be a publicly reachable URL or a
+ * `data:` URL). Otherwise we fall back to the CSS-text "BedPro" logo so the
+ * mark always appears on the invoice.
+ */
+function renderLogoMarkup(logoUrl: string | null | undefined): string {
+  if (logoUrl) {
+    return `<img src="${escape(logoUrl)}" alt="Bed Pro" style="height:46px;width:auto;display:block;" />`
+  }
+  return `<div class="logo"><span class="b">Bed</span><span class="p">Pro</span></div>`
+}
+
 function shell(title: string, body: string): string {
   return `<!doctype html>
 <html lang="en">
@@ -77,11 +90,12 @@ export function renderInvoiceHtml(
       : ''
 
   const isPaid = invoice.status === 'PAID'
+  const logoMarkup = renderLogoMarkup(company.logoUrl)
 
   const body = `
 <div class="header">
   <div>
-    <div class="logo"><span class="b">Bed</span><span class="p">Pro</span></div>
+    ${logoMarkup}
     <div class="meta">${escape(company.address)}</div>
     <div class="meta">${escape(company.phone)} · ${escape(company.email)}${company.vatNumber ? ` · VAT: ${escape(company.vatNumber)}` : ''}</div>
   </div>
@@ -139,10 +153,11 @@ export function renderReceiptHtml(
   company: CompanySettings,
 ): string {
   const inv = receipt.invoice
+  const logoMarkup = renderLogoMarkup(company.logoUrl)
   const body = `
 <div class="header">
   <div>
-    <div class="logo"><span class="b">Bed</span><span class="p">Pro</span></div>
+    ${logoMarkup}
     <div class="meta">${escape(company.address)}</div>
     <div class="meta">${escape(company.phone)} · ${escape(company.email)}${company.vatNumber ? ` · VAT: ${escape(company.vatNumber)}` : ''}</div>
   </div>

@@ -13,6 +13,7 @@ type Initial = {
   website: string | null
   vatNumber: string | null
   registrationNumber: string | null
+  logoUrl: string | null
   taxRate: number
   bankName: string | null
   bankBranch: string | null
@@ -31,6 +32,7 @@ export function SettingsForm({ initial }: { initial: Initial }) {
     website: initial.website ?? '',
     vatNumber: initial.vatNumber ?? '',
     registrationNumber: initial.registrationNumber ?? '',
+    logoUrl: initial.logoUrl ?? '',
     taxRate: String(initial.taxRate),
     bankName: initial.bankName ?? '',
     bankBranch: initial.bankBranch ?? '',
@@ -102,6 +104,39 @@ export function SettingsForm({ initial }: { initial: Initial }) {
               />
             </div>
           ))}
+        </div>
+      </div>
+
+      <div className="bp-card p-6">
+        <h2 className="font-bold mb-1">Logo</h2>
+        <p className="text-xs text-gray-500 mb-4">
+          Used on every invoice and receipt. Paste an image URL (https://…) or a{' '}
+          <code className="text-[11px]">data:image/png;base64,…</code> URL. Leave blank to use the
+          built-in &ldquo;BedPro&rdquo; text logo.
+        </p>
+        <div className="grid grid-cols-1 md:grid-cols-[1fr_140px] gap-3 items-start">
+          <input
+            value={form.logoUrl}
+            onChange={(e) => setForm({ ...form, logoUrl: e.target.value })}
+            className="bp-input"
+            placeholder="https://example.com/bedpro-logo.png"
+          />
+          <div className="bp-card p-3 flex items-center justify-center h-[60px] bg-gray-50">
+            {form.logoUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={form.logoUrl}
+                alt="Logo preview"
+                className="max-h-[44px] w-auto"
+                onError={(e) => ((e.currentTarget.style.display = 'none'))}
+              />
+            ) : (
+              <span className="bp-logo text-[22px]">
+                <span className="bp-logo-bed">Bed</span>
+                <span className="bp-logo-pro">Pro</span>
+              </span>
+            )}
+          </div>
         </div>
       </div>
 

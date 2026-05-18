@@ -14,17 +14,23 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   // Scoped to the user's own invoices when they don't have view-all rights.
   const today = new Date()
   today.setHours(0, 0, 0, 0)
-  const overdueCount = await prisma.invoice.count({
-    where: {
-      status: { in: ['UNPAID', 'SENT'] },
-      dueDate: { lt: today },
-      ...(can(session.user.role, 'INVOICES_VIEW_ALL') ? {} : { createdById: session.user.id }),
-    },
-  })
+  const [overdueCount, company] = await Promise.all([
+    prisma.invoice.count({
+      where: {
+        status: { in: ['UNPAID', 'SENT'] },
+        dueDate: { lt: today },
+        ...(can(session.user.role, 'INVOICES_VIEW_ALL') ? {} : { createdById: session.user.id }),
+      },
+    }),
+    prisma.companySettings.findUnique({
+      where: { id: 'singleton' },
+      select: { logoUrl: true },
+    }),
+  ])
 
   return (
     <div className="flex h-screen overflow-hidden bg-[#F6F6F6]">
-      <Sidebar user={session.user} overdueCount={overdueCount} />
+      <Sidebar user={session.user} overdueCount={overdueCount} logoUrl={company?.logoUrl ?? null} />
       <div className="flex-1 flex flex-col overflow-hidden">
         <Header user={session.user} />
         <main className="flex-1 overflow-auto px-8 py-6">{children}</main>

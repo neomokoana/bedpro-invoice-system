@@ -1,6 +1,7 @@
 import type { Metadata } from 'next'
 import { redirect } from 'next/navigation'
 import { auth } from '@/lib/auth'
+import { prisma } from '@/lib/prisma'
 import { LoginForm } from './login-form'
 import { BedProLogo } from '@/components/bedpro-logo'
 
@@ -12,16 +13,23 @@ export default async function LoginPage({
   searchParams: Promise<{ callbackUrl?: string; error?: string }>
 }) {
   // Next 16 / React 19: searchParams is a Promise. Await it.
-  const params = await searchParams
-  const session = await auth()
+  const [params, session, company] = await Promise.all([
+    searchParams,
+    auth(),
+    prisma.companySettings.findUnique({
+      where: { id: 'singleton' },
+      select: { logoUrl: true },
+    }),
+  ])
   if (session?.user) {
     redirect(session.user.mustChangePassword ? '/set-password' : '/dashboard')
   }
+  const logoUrl = company?.logoUrl ?? null
 
   return (
     <div className="min-h-screen grid lg:grid-cols-2 bg-[#F6F6F6]">
       <div className="hidden lg:flex flex-col justify-between bg-[#111] text-white p-12">
-        <BedProLogo size={36} />
+        <BedProLogo size={36} src={logoUrl} />
         <div>
           <h1 className="text-4xl font-extrabold leading-tight">
             Invoice & receipt management
@@ -41,7 +49,7 @@ export default async function LoginPage({
       <div className="flex items-center justify-center p-6">
         <div className="bp-card w-full max-w-md p-8">
           <div className="lg:hidden mb-6">
-            <BedProLogo size={32} />
+            <BedProLogo size={32} src={logoUrl} />
           </div>
           <h2 className="text-2xl font-extrabold">Sign in</h2>
           <p className="text-sm text-gray-500 mt-1">

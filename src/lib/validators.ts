@@ -66,6 +66,17 @@ export const settingsSchema = z.object({
   website: z.string().url().max(200).optional().or(z.literal('')),
   vatNumber: z.string().max(50).optional(),
   registrationNumber: z.string().max(50).optional(),
+  // Accept either a regular http(s) URL or a `data:` URL (base64-embedded image).
+  // Empty string is allowed and gets normalised to null in the API.
+  logoUrl: z
+    .string()
+    .max(20_000)
+    .refine(
+      (v) => v === '' || /^(https?:\/\/|data:image\/)/i.test(v),
+      'Must be an http(s) URL or a data:image/... URL',
+    )
+    .optional()
+    .or(z.literal('')),
   taxRate: z.number().min(0).max(100).finite(),
   bankName: z.string().max(100).optional(),
   bankBranch: z.string().max(100).optional(),

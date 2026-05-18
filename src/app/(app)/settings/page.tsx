@@ -26,6 +26,7 @@ export default async function SettingsPage() {
           website: settings.website,
           vatNumber: settings.vatNumber,
           registrationNumber: settings.registrationNumber,
+          logoUrl: settings.logoUrl,
           taxRate: Number(settings.taxRate),
           bankName: settings.bankName,
           bankBranch: settings.bankBranch,
