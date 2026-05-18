@@ -6,6 +6,7 @@ import { NextResponse } from 'next/server'
 import { ZodError } from 'zod'
 import { Prisma } from '@prisma/client'
 import { auth, type SessionUser } from './auth'
+import { prisma } from './prisma'
 import { can, type Permission } from './permissions'
 
 export class ApiError extends Error {
@@ -18,12 +19,46 @@ export class ApiError extends Error {
   }
 }
 
-export async function requireSession(): Promise<SessionUser> {
+/**
+ * Resolve the current session and re-validate the user against the DB.
+ *
+ * The JWT cookie alone is not sufficient — it lives for 30 days and survives
+ * deactivation/role changes. Every authenticated API call therefore pays one
+ * cheap `select` against `users` to confirm:
+ *
+ *   - the user still exists,
+ *   - `isActive` is still true,
+ *   - the *current* `role` (not the one cached in the JWT at sign-in).
+ *
+ * `allowMustChangePassword` is opt-in for endpoints that legitimately need
+ * to serve a user who's mid-onboarding (`/api/account/password`). Every
+ * other API rejects 401 so the client redirects to `/set-password`.
+ */
+export async function requireSession(
+  opts: { allowMustChangePassword?: boolean } = {},
+): Promise<SessionUser> {
   const session = await auth()
   if (!session?.user) {
     throw new ApiError(401, 'Not authenticated')
   }
-  return session.user as SessionUser
+  const fresh = await prisma.user.findUnique({
+    where: { id: session.user.id },
+    select: { isActive: true, role: true, branch: true, mustChangePassword: true },
+  })
+  if (!fresh || !fresh.isActive) {
+    throw new ApiError(401, 'Account inactive')
+  }
+  if (fresh.mustChangePassword && !opts.allowMustChangePassword) {
+    throw new ApiError(403, 'Password change required')
+  }
+  return {
+    id: session.user.id,
+    email: session.user.email,
+    name: session.user.name,
+    role: fresh.role, // freshest — admin may have promoted/demoted since sign-in
+    branch: fresh.branch ?? null,
+    mustChangePassword: fresh.mustChangePassword,
+  }
 }
 
 export async function requirePermission(permission: Permission): Promise<SessionUser> {

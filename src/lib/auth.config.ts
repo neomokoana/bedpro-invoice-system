@@ -2,8 +2,8 @@
  * Edge-safe Auth.js config — no DB, no bcrypt, no Node-only imports.
  * Used by middleware.ts which runs on the Edge runtime.
  *
- * The full config (with the credentials provider that hits the DB) lives in
- * auth.ts and extends this one.
+ * The full config (with the credentials provider that hits the DB, and the
+ * DB-backed `jwt` callback) lives in auth.ts and extends this one.
  */
 import type { NextAuthConfig } from 'next-auth'
 import { canAccessPath } from './permissions'
@@ -23,17 +23,17 @@ export const authConfig = {
      * The single source of truth for whether a request is allowed.
      * Returns:
      *   - true  → allow
-     *   - false → redirect to /login (NextAuth's default for that signIn page)
-     *   - NextResponse → custom redirect (we use this for role gates and the
-     *                     first-login set-password flow)
+     *   - false → redirect to /login (NextAuth's default for pages.signIn)
+     *   - Response → custom redirect (we use this for role gates and the
+     *                 first-login set-password flow)
      */
     authorized({ auth, request }) {
       const { nextUrl } = request
       const isLoggedIn = !!auth?.user
       const pathname = nextUrl.pathname
 
-      // /api/* is excluded from the middleware matcher entirely — so we only
-      // see page requests here.
+      // /api/* is excluded from the middleware matcher entirely — we only see
+      // page requests here.
 
       // /login: public when signed out, redirect home when signed in.
       if (pathname === '/login') {
@@ -61,20 +61,10 @@ export const authConfig = {
       return true
     },
 
-    async jwt({ token, user, trigger, session }) {
-      if (user) {
-        token.id = user.id
-        token.role = (user as { role: Role }).role
-        token.branch = (user as { branch: string | null }).branch ?? null
-        token.mustChangePassword = (user as { mustChangePassword: boolean }).mustChangePassword
-      }
-      // Client-side update() can flip mustChangePassword off after the user sets one.
-      if (trigger === 'update' && session?.mustChangePassword === false) {
-        token.mustChangePassword = false
-      }
-      return token
-    },
-
+    /**
+     * Shape the session object that page server components / middleware see.
+     * Edge-safe: pure projection of JWT claims onto `session.user`.
+     */
     async session({ session, token }) {
       if (session.user) {
         session.user.id = token.id as string

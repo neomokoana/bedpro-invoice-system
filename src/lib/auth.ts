@@ -10,6 +10,9 @@
  *     email-enumeration via response timing
  *   - role + branch carried in the token so the edge middleware can
  *     authorize without a DB round-trip
+ *   - jwt callback re-syncs `mustChangePassword`, `role`, `branch` and
+ *     `isActive` from the DB on `update()` so the client can never spoof
+ *     them via `useSession().update({...})`
  */
 import NextAuth from 'next-auth'
 import Credentials from 'next-auth/providers/credentials'
@@ -22,6 +25,14 @@ import { authConfig } from './auth.config'
 const LOCKOUT_MINUTES = 15
 const MAX_FAILED_ATTEMPTS = 5
 
+/**
+ * Valid-format bcrypt-2a hash (60 chars, $2a$12$<22-char-salt><31-char-hash>)
+ * pre-computed from `bcrypt.hashSync('do-not-use', 12)`. Compared against on
+ * the missing-user path so timing is similar to a real lookup → defeats
+ * email enumeration via response-time analysis.
+ */
+const DUMMY_HASH = '$2a$12$N6jH9rD0nN8rA5b1aTeP9ePqEkqp7nL.iVuYwG2vN9bN.j0bLO7Eu'
+
 const loginSchema = z.object({
   email: z.string().email().toLowerCase().trim(),
   password: z.string().min(1).max(200),
@@ -29,6 +40,49 @@ const loginSchema = z.object({
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
   ...authConfig,
+  callbacks: {
+    ...authConfig.callbacks,
+    /**
+     * jwt() runs on sign-in (with `user`), on session refresh, and when the
+     * client calls `useSession().update(...)`. The DB-backed re-sync on the
+     * `update` branch is the security boundary that stops a user from
+     * spoofing `mustChangePassword: false` etc. via devtools.
+     */
+    async jwt({ token, user, trigger }) {
+      // Initial sign-in.
+      if (user) {
+        token.id = user.id
+        token.role = (user as { role: Role }).role
+        token.branch = (user as { branch: string | null }).branch ?? null
+        token.mustChangePassword = (user as { mustChangePassword: boolean }).mustChangePassword
+        return token
+      }
+      // update() from client — NEVER trust the passed `session` here. Re-read
+      // the authoritative fields from the DB and overwrite the token. If the
+      // user has been deactivated, blank the token so any subsequent request
+      // is treated as unauthenticated.
+      if (trigger === 'update' && typeof token.id === 'string') {
+        const fresh = await prisma.user.findUnique({
+          where: { id: token.id },
+          select: {
+            role: true,
+            branch: true,
+            mustChangePassword: true,
+            isActive: true,
+          },
+        })
+        if (!fresh || !fresh.isActive) {
+          // Returning `null` from jwt() instructs Auth.js to invalidate the
+          // session — the cookie's sub becomes unrecoverable.
+          return null
+        }
+        token.role = fresh.role
+        token.branch = fresh.branch ?? null
+        token.mustChangePassword = fresh.mustChangePassword
+      }
+      return token
+    },
+  },
   providers: [
     Credentials({
       credentials: {
@@ -45,7 +99,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         // Constant-time-ish: do a dummy bcrypt compare when the user is missing,
         // so timing doesn't leak which emails exist.
         if (!user) {
-          await bcrypt.compare(password, '$2a$12$invalidsaltinvalidsaltinvalidsaltinvalidsa')
+          await bcrypt.compare(password, DUMMY_HASH)
           return null
         }
 

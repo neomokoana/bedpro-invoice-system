@@ -71,6 +71,31 @@ export async function sendMail(args: {
 
 const RED = '#E8191A'
 
+/**
+ * Escape user-controlled strings before interpolating into the email HTML.
+ * Customer names, invoice notes, company name etc. can contain `<` / `>` / `&` /
+ * `"` and would otherwise render as live HTML in the recipient's mail client —
+ * a stored XSS / phishing surface.
+ */
+function esc(s: string | null | undefined): string {
+  if (s == null) return ''
+  return String(s)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;')
+}
+
+/** Only allow http(s) URLs in href / src attributes — defence against
+ *  javascript: / data: links smuggled in. */
+function escUrl(s: string | null | undefined): string {
+  if (s == null) return '#'
+  const v = String(s).trim()
+  if (!/^https?:\/\//i.test(v)) return '#'
+  return esc(v)
+}
+
 function emailShell(content: string): string {
   return `<!doctype html><html><body style="margin:0;padding:0;background:#f6f6f6;font-family:'DM Sans',system-ui,sans-serif;color:#111;">
     <table width="100%" cellpadding="0" cellspacing="0" style="background:#f6f6f6;">
@@ -98,19 +123,19 @@ export function invoiceEmailHtml(args: {
   notes?: string | null
 }): string {
   return emailShell(`
-    <p style="margin:0 0 12px;font-size:14px;">Hi ${args.customerName},</p>
+    <p style="margin:0 0 12px;font-size:14px;">Hi ${esc(args.customerName)},</p>
     <p style="margin:0 0 12px;font-size:14px;line-height:1.5;">
-      Please find your invoice <strong>${args.invoiceNumber}</strong> attached as a PDF.
+      Please find your invoice <strong>${esc(args.invoiceNumber)}</strong> attached as a PDF.
     </p>
     <table cellpadding="0" cellspacing="0" style="margin:18px 0;background:#fafafa;border-radius:8px;border-left:3px solid ${RED};">
       <tr><td style="padding:14px 18px;">
         <div style="font-size:11px;color:#888;text-transform:uppercase;letter-spacing:1px;">Total Due</div>
-        <div style="font-size:28px;font-weight:800;color:${RED};margin-top:4px;">${args.total}</div>
-        <div style="font-size:12px;color:#666;margin-top:2px;">Due by ${args.dueDate}</div>
+        <div style="font-size:28px;font-weight:800;color:${RED};margin-top:4px;">${esc(args.total)}</div>
+        <div style="font-size:12px;color:#666;margin-top:2px;">Due by ${esc(args.dueDate)}</div>
       </td></tr>
     </table>
-    ${args.notes ? `<p style="margin:0 0 12px;font-size:13px;color:#666;">${args.notes}</p>` : ''}
-    <p style="margin:18px 0 0;font-size:13px;color:#666;">Thanks,<br/>${args.companyName}</p>
+    ${args.notes ? `<p style="margin:0 0 12px;font-size:13px;color:#666;">${esc(args.notes)}</p>` : ''}
+    <p style="margin:18px 0 0;font-size:13px;color:#666;">Thanks,<br/>${esc(args.companyName)}</p>
   `)
 }
 
@@ -121,14 +146,14 @@ export function inviteEmailHtml(args: {
   role: string
 }): string {
   return emailShell(`
-    <p style="margin:0 0 12px;font-size:14px;">Hi ${args.name},</p>
+    <p style="margin:0 0 12px;font-size:14px;">Hi ${esc(args.name)},</p>
     <p style="margin:0 0 12px;font-size:14px;line-height:1.5;">
-      An account has been created for you on the Bed Pro Invoice System with the <strong>${args.role}</strong> role.
+      An account has been created for you on the Bed Pro Invoice System with the <strong>${esc(args.role)}</strong> role.
     </p>
     <p style="margin:0 0 12px;font-size:14px;">Use this temporary password to sign in for the first time. You&apos;ll be asked to set your own password immediately:</p>
-    <pre style="background:#111;color:#fff;padding:14px 18px;border-radius:8px;font-size:16px;letter-spacing:1px;font-family:Menlo,monospace;">${args.tempPassword}</pre>
+    <pre style="background:#111;color:#fff;padding:14px 18px;border-radius:8px;font-size:16px;letter-spacing:1px;font-family:Menlo,monospace;">${esc(args.tempPassword)}</pre>
     <p style="margin:18px 0 0;font-size:14px;">
-      <a href="${args.loginUrl}" style="background:${RED};color:#fff;text-decoration:none;padding:10px 18px;border-radius:8px;font-weight:700;display:inline-block;">Sign in</a>
+      <a href="${escUrl(args.loginUrl)}" style="background:${RED};color:#fff;text-decoration:none;padding:10px 18px;border-radius:8px;font-weight:700;display:inline-block;">Sign in</a>
     </p>
     <p style="margin:18px 0 0;font-size:11px;color:#999;">If you weren&apos;t expecting this, please ignore the email.</p>
   `)

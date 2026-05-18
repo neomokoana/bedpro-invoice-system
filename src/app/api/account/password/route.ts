@@ -6,7 +6,9 @@ import { passwordChangeSchema } from '@/lib/validators'
 
 export async function POST(req: NextRequest) {
   try {
-    const me = await requireSession()
+    // First-login users (mustChangePassword=true) must be allowed through here,
+    // because changing the password is the whole point of this endpoint.
+    const me = await requireSession({ allowMustChangePassword: true })
     const body = await req.json()
     const { currentPassword, newPassword } = passwordChangeSchema.parse(body)
 

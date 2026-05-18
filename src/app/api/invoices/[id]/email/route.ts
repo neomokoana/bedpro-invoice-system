@@ -51,7 +51,12 @@ export async function POST(
       ],
     })
 
-    if (!result.sent) throw new ApiError(500, result.error ?? 'Email failed')
+    if (!result.sent) {
+      // Don't forward Nodemailer's raw error message to the client — it can
+      // include SMTP host, auth-failure reasons, RCPT errors etc. that leak
+      // infrastructure details. The full error is already logged by sendMail.
+      throw new ApiError(500, 'Could not send the email. Please try again later.')
+    }
 
     // Bump status to SENT (if still DRAFT/UNPAID) and stamp emailedAt.
     await prisma.invoice.update({
