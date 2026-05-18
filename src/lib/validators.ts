@@ -28,8 +28,40 @@ const lineItemSchema = z.object({
   unitPrice: z.number().nonnegative().finite().max(10_000_000),
 })
 
+/**
+ * Customer payload for invoice creation.
+ *
+ *   - If `id` is provided → use that existing customer; the rest is ignored.
+ *   - If `id` is absent   → create a new customer with these fields.
+ *
+ * Only `name` is required when creating new. Phone, email, and address are
+ * optional — address in particular is only needed when delivering.
+ */
+const invoiceCustomerSchema = z.object({
+  id: z.string().cuid().optional(),
+  name: z.string().min(1).max(200).trim(),
+  phone: z
+    .string()
+    .max(50)
+    .trim()
+    .optional()
+    .or(z.literal('').transform(() => undefined)),
+  email: z
+    .string()
+    .email()
+    .max(200)
+    .optional()
+    .or(z.literal('').transform(() => undefined)),
+  address: z
+    .string()
+    .max(500)
+    .trim()
+    .optional()
+    .or(z.literal('').transform(() => undefined)),
+})
+
 export const invoiceCreateSchema = z.object({
-  customerId: z.string().cuid(),
+  customer: invoiceCustomerSchema,
   issueDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   dueDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   taxRate: z.number().min(0).max(100).finite(),

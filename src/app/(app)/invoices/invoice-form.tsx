@@ -2,11 +2,19 @@
 
 import { useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { Plus, Trash2, Loader2 } from 'lucide-react'
+import { Plus, Trash2, Loader2, UserPlus, Users } from 'lucide-react'
 import { calcTotals } from '@/lib/totals'
 import { formatMoney, todayStr, addDaysStr } from '@/lib/format'
+import { cn } from '@/lib/cn'
 
-type Customer = { id: string; name: string; company: string | null }
+type Customer = {
+  id: string
+  name: string
+  company: string | null
+  phone: string | null
+  email: string | null
+  address: string | null
+}
 type Product = { id: string; name: string; unitPrice: number }
 type Line = {
   productId: string | null
@@ -14,6 +22,7 @@ type Line = {
   qty: string
   unitPrice: string
 }
+type CustomerMode = 'existing' | 'new'
 
 export function InvoiceForm({
   customers,
@@ -25,7 +34,16 @@ export function InvoiceForm({
   defaultTaxRate: number
 }) {
   const router = useRouter()
+  const [customerMode, setCustomerMode] = useState<CustomerMode>(
+    customers.length > 0 ? 'existing' : 'new',
+  )
   const [customerId, setCustomerId] = useState(customers[0]?.id ?? '')
+  const [newCustomer, setNewCustomer] = useState({
+    name: '',
+    phone: '',
+    email: '',
+    address: '',
+  })
   const [issueDate, setIssueDate] = useState(todayStr())
   const [dueDate, setDueDate] = useState(addDaysStr(15))
   const [taxRate, setTaxRate] = useState(String(defaultTaxRate))
@@ -59,7 +77,30 @@ export function InvoiceForm({
 
   async function submit(status: 'DRAFT' | 'UNPAID') {
     setError(null)
-    if (!customerId) return setError('Pick a customer.')
+
+    // Build the customer payload based on which mode the form is in.
+    let customerPayload: {
+      id?: string
+      name: string
+      phone?: string
+      email?: string
+      address?: string
+    }
+    if (customerMode === 'existing') {
+      const selected = customers.find((c) => c.id === customerId)
+      if (!selected) return setError('Pick a customer.')
+      customerPayload = { id: selected.id, name: selected.name }
+    } else {
+      const name = newCustomer.name.trim()
+      if (!name) return setError('Enter a customer name.')
+      customerPayload = {
+        name,
+        phone: newCustomer.phone.trim() || undefined,
+        email: newCustomer.email.trim() || undefined,
+        address: newCustomer.address.trim() || undefined,
+      }
+    }
+
     if (!lines.length || lines.every((l) => !l.description.trim()))
       return setError('Add at least one line item.')
 
@@ -68,7 +109,7 @@ export function InvoiceForm({
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({
-        customerId,
+        customer: customerPayload,
         issueDate,
         dueDate,
         taxRate: Number(taxRate),
@@ -96,34 +137,142 @@ export function InvoiceForm({
     router.refresh()
   }
 
+  const selectedExisting = customers.find((c) => c.id === customerId)
+
   return (
     <div className="space-y-6">
       {error && (
         <div className="rounded-lg border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-700">{error}</div>
       )}
 
+      {/* ── Customer Info ──────────────────────────────────────── */}
+      <div className="bp-card p-6 space-y-4">
+        <div className="flex items-center justify-between gap-3 flex-wrap">
+          <h2 className="font-bold">Customer info</h2>
+          <div className="inline-flex rounded-lg border border-gray-200 bg-gray-50 p-0.5">
+            <button
+              type="button"
+              onClick={() => setCustomerMode('existing')}
+              disabled={customers.length === 0}
+              className={cn(
+                'inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-bold transition',
+                customerMode === 'existing'
+                  ? 'bg-white text-[#111] shadow-sm'
+                  : 'text-gray-500 hover:text-gray-700',
+                customers.length === 0 && 'opacity-50 cursor-not-allowed',
+              )}
+              title={customers.length === 0 ? 'No customers yet — add a new one' : ''}
+            >
+              <Users className="h-3.5 w-3.5" /> Existing
+            </button>
+            <button
+              type="button"
+              onClick={() => setCustomerMode('new')}
+              className={cn(
+                'inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-bold transition',
+                customerMode === 'new' ? 'bg-white text-[#111] shadow-sm' : 'text-gray-500 hover:text-gray-700',
+              )}
+            >
+              <UserPlus className="h-3.5 w-3.5" /> New
+            </button>
+          </div>
+        </div>
+
+        {customerMode === 'existing' ? (
+          <div className="space-y-3">
+            <div>
+              <label className="bp-label mb-1 block">Customer name</label>
+              <select
+                value={customerId}
+                onChange={(e) => setCustomerId(e.target.value)}
+                className="bp-input"
+              >
+                {customers.length === 0 && <option value="">No customers — switch to New</option>}
+                {customers.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.name}
+                    {c.company ? ` (${c.company})` : ''}
+                  </option>
+                ))}
+              </select>
+            </div>
+            {selectedExisting && (
+              <div className="rounded-lg bg-gray-50 border border-gray-100 px-3 py-2 text-[12px] text-gray-600 space-y-0.5">
+                <div>
+                  <span className="text-gray-400">Phone:</span> {selectedExisting.phone ?? '—'}
+                </div>
+                <div>
+                  <span className="text-gray-400">Email:</span> {selectedExisting.email ?? '—'}
+                </div>
+                <div>
+                  <span className="text-gray-400">Address:</span> {selectedExisting.address ?? '—'}
+                </div>
+              </div>
+            )}
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <div className="md:col-span-2">
+              <label className="bp-label mb-1 block">
+                Customer name <span className="text-[#E8191A]">*</span>
+              </label>
+              <input
+                value={newCustomer.name}
+                onChange={(e) => setNewCustomer({ ...newCustomer, name: e.target.value })}
+                className="bp-input"
+                placeholder="e.g. Themba Nkosi"
+                required
+              />
+            </div>
+            <div>
+              <label className="bp-label mb-1 block">Phone</label>
+              <input
+                value={newCustomer.phone}
+                onChange={(e) => setNewCustomer({ ...newCustomer, phone: e.target.value })}
+                className="bp-input"
+                placeholder="082 456 7890"
+              />
+            </div>
+            <div>
+              <label className="bp-label mb-1 block">Email</label>
+              <input
+                type="email"
+                value={newCustomer.email}
+                onChange={(e) => setNewCustomer({ ...newCustomer, email: e.target.value })}
+                className="bp-input"
+                placeholder="customer@example.com"
+              />
+            </div>
+            <div className="md:col-span-2">
+              <label className="bp-label mb-1 block">
+                Delivery address{' '}
+                <span className="text-gray-400 font-normal normal-case tracking-normal">
+                  — optional, only if you&apos;re delivering
+                </span>
+              </label>
+              <input
+                value={newCustomer.address}
+                onChange={(e) => setNewCustomer({ ...newCustomer, address: e.target.value })}
+                className="bp-input"
+                placeholder="14 Oak Street, Pretoria"
+              />
+            </div>
+            <p className="md:col-span-2 text-[11px] text-gray-500">
+              This will create a new customer record so you can re-use them on future invoices.
+            </p>
+          </div>
+        )}
+      </div>
+
+      {/* ── Dates ──────────────────────────────────────────────── */}
       <div className="bp-card p-6 grid grid-cols-1 md:grid-cols-2 gap-4">
         <div>
-          <label className="bp-label mb-1 block">Customer</label>
-          <select value={customerId} onChange={(e) => setCustomerId(e.target.value)} className="bp-input">
-            {customers.length === 0 && <option value="">No customers — create one first</option>}
-            {customers.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.name}
-                {c.company ? ` (${c.company})` : ''}
-              </option>
-            ))}
-          </select>
+          <label className="bp-label mb-1 block">Issue date</label>
+          <input type="date" value={issueDate} onChange={(e) => setIssueDate(e.target.value)} className="bp-input" />
         </div>
-        <div className="grid grid-cols-2 gap-4">
-          <div>
-            <label className="bp-label mb-1 block">Issue date</label>
-            <input type="date" value={issueDate} onChange={(e) => setIssueDate(e.target.value)} className="bp-input" />
-          </div>
-          <div>
-            <label className="bp-label mb-1 block">Due date</label>
-            <input type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} className="bp-input" />
-          </div>
+        <div>
+          <label className="bp-label mb-1 block">Due date</label>
+          <input type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} className="bp-input" />
         </div>
       </div>
 

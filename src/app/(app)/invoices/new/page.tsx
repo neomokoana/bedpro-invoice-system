@@ -14,7 +14,14 @@ export default async function NewInvoicePage() {
     <div className="max-w-5xl">
       <h1 className="text-2xl font-extrabold mb-6">New Invoice</h1>
       <InvoiceForm
-        customers={customers.map((c) => ({ id: c.id, name: c.name, company: c.company }))}
+        customers={customers.map((c) => ({
+          id: c.id,
+          name: c.name,
+          company: c.company,
+          phone: c.phone,
+          email: c.email,
+          address: c.address,
+        }))}
         products={products.map((p) => ({ id: p.id, name: p.name, unitPrice: Number(p.unitPrice) }))}
         defaultTaxRate={Number(settings?.taxRate ?? 15)}
       />

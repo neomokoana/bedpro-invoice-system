@@ -7,6 +7,7 @@ import type { Invoice, InvoiceItem, Customer, CompanySettings, Receipt } from '@
 import { formatMoney, formatDate } from './format'
 
 const RED = '#E8191A'
+const BRAND_WEBSITE = 'www.bedpro.org.za'
 
 function escape(s: string | null | undefined): string {
   if (s == null) return ''
@@ -143,6 +144,7 @@ ${bankBlock}
 
 <div class="footer">
   <strong style="color:#111;">${escape(company.name)}</strong> · Thank you for your business · ${escape(company.address)}
+  <div style="margin-top:4px;font-size:9px;color:#bbb;">${BRAND_WEBSITE}</div>
 </div>`
 
   return shell(`Invoice ${invoice.number} — ${company.name}`, body)
@@ -187,6 +189,7 @@ ${receipt.notes ? `<div class="notes">${escape(receipt.notes)}</div>` : ''}
 
 <div class="footer">
   <strong style="color:#111;">${escape(company.name)}</strong> · This is your proof of payment
+  <div style="margin-top:4px;font-size:9px;color:#bbb;">${BRAND_WEBSITE}</div>
 </div>`
 
   return shell(`Receipt ${receipt.number} — ${company.name}`, body)

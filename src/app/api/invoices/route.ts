@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { apiError, requirePermission } from '@/lib/api-auth'
+import { apiError, requirePermission, ApiError } from '@/lib/api-auth'
 import { invoiceCreateSchema } from '@/lib/validators'
 import { calcTotals } from '@/lib/totals'
 import { nextInvoiceNumber } from '@/lib/numbering'
@@ -31,11 +31,38 @@ export async function POST(req: NextRequest) {
     const totals = calcTotals(data.items, data.taxRate, data.discount)
 
     const invoice = await prisma.$transaction(async (tx) => {
+      // Resolve the customer: either re-use an existing one by id, or create a
+      // new one from the form data. Both paths live inside the same transaction
+      // so a failure later (e.g. invoice number allocation) rolls back any
+      // accidentally-created customer too.
+      let customerId: string
+      if (data.customer.id) {
+        const existing = await tx.customer.findUnique({
+          where: { id: data.customer.id },
+          select: { id: true, isActive: true },
+        })
+        if (!existing || !existing.isActive) {
+          throw new ApiError(400, 'Selected customer no longer exists.')
+        }
+        customerId = existing.id
+      } else {
+        const created = await tx.customer.create({
+          data: {
+            name: data.customer.name,
+            phone: data.customer.phone ?? null,
+            email: data.customer.email ?? null,
+            address: data.customer.address ?? null,
+          },
+          select: { id: true },
+        })
+        customerId = created.id
+      }
+
       const number = await nextInvoiceNumber(tx)
       return tx.invoice.create({
         data: {
           number,
-          customerId: data.customerId,
+          customerId,
           status: data.status,
           issueDate: new Date(data.issueDate + 'T00:00:00Z'),
           dueDate: new Date(data.dueDate + 'T00:00:00Z'),
