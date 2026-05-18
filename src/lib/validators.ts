@@ -67,10 +67,13 @@ export const settingsSchema = z.object({
   vatNumber: z.string().max(50).optional(),
   registrationNumber: z.string().max(50).optional(),
   // Accept either a regular http(s) URL or a `data:` URL (base64-embedded image).
+  // 256KB max — large enough for a generous PNG/SVG embedded directly into the
+  // invoice HTML, but bounded so the form payload + DB row stay sane. For
+  // anything bigger, host the image and paste an https:// URL.
   // Empty string is allowed and gets normalised to null in the API.
   logoUrl: z
     .string()
-    .max(20_000)
+    .max(262_144)
     .refine(
       (v) => v === '' || /^(https?:\/\/|data:image\/)/i.test(v),
       'Must be an http(s) URL or a data:image/... URL',
