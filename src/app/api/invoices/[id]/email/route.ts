@@ -40,6 +40,7 @@ export async function POST(
         dueDate: formatDate(invoice.dueDate),
         companyName: company.name,
         notes: invoice.notes,
+        logoUrl: company.logoUrl,
       }),
       attachments: [
         {

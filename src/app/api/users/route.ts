@@ -5,6 +5,7 @@ import { apiError, requirePermission, ApiError } from '@/lib/api-auth'
 import { userInviteSchema } from '@/lib/validators'
 import { generateTempPassword } from '@/lib/temp-password'
 import { sendMail, inviteEmailHtml } from '@/lib/email'
+import { audit, clientIp } from '@/lib/audit'
 
 export async function GET() {
   try {
@@ -31,7 +32,7 @@ export async function GET() {
 
 export async function POST(req: NextRequest) {
   try {
-    await requirePermission('USERS_MANAGE')
+    const actor = await requirePermission('USERS_MANAGE')
     const body = await req.json()
     const data = userInviteSchema.parse(body)
 
@@ -54,10 +55,29 @@ export async function POST(req: NextRequest) {
     })
 
     const loginUrl = (process.env.NEXTAUTH_URL ?? '').replace(/\/$/, '') + '/login'
+    const company = await prisma.companySettings.findUnique({
+      where: { id: 'singleton' },
+      select: { logoUrl: true },
+    })
     const mail = await sendMail({
       to: user.email,
       subject: 'Your Bed Pro account is ready',
-      html: inviteEmailHtml({ name: user.name, tempPassword, loginUrl, role: user.role }),
+      html: inviteEmailHtml({
+        name: user.name,
+        tempPassword,
+        loginUrl,
+        role: user.role,
+        logoUrl: company?.logoUrl,
+      }),
+    })
+
+    await audit({
+      actor: { id: actor.id, email: actor.email },
+      action: 'user.invite',
+      entityType: 'User',
+      entityId: user.id,
+      ip: clientIp(req),
+      metadata: { email: user.email, role: user.role, emailed: mail.sent },
     })
 
     // If email failed, return tempPassword once so admin can share it manually.

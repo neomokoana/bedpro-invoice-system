@@ -8,6 +8,7 @@ import { Prisma } from '@prisma/client'
 import { auth, type SessionUser } from './auth'
 import { prisma } from './prisma'
 import { can, type Permission } from './permissions'
+import { logger } from './logger'
 
 export class ApiError extends Error {
   constructor(
@@ -100,6 +101,6 @@ export function apiError(err: unknown): NextResponse {
       )
     }
   }
-  console.error('[api]', err)
+  logger.error('api.unhandled', undefined, err)
   return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
 }

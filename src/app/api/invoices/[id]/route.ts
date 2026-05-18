@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { apiError, requireSession, ApiError } from '@/lib/api-auth'
 import { can } from '@/lib/permissions'
+import { audit, clientIp } from '@/lib/audit'
 
 export async function GET(
   _req: NextRequest,
@@ -25,14 +26,29 @@ export async function GET(
 }
 
 export async function DELETE(
-  _req: NextRequest,
+  req: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ) {
   try {
     const user = await requireSession()
     if (!can(user.role, 'INVOICES_DELETE')) throw new ApiError(403, 'Forbidden')
     const { id } = await params
-    await prisma.invoice.delete({ where: { id } })
+    const removed = await prisma.invoice.delete({
+      where: { id },
+      select: { id: true, number: true, total: true, customerId: true },
+    })
+    await audit({
+      actor: { id: user.id, email: user.email },
+      action: 'invoice.delete',
+      entityType: 'Invoice',
+      entityId: removed.id,
+      ip: clientIp(req),
+      metadata: {
+        number: removed.number,
+        total: removed.total.toString(),
+        customerId: removed.customerId,
+      },
+    })
     return NextResponse.json({ ok: true })
   } catch (e) {
     return apiError(e)

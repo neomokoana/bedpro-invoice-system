@@ -11,6 +11,7 @@
  * Auth helpers if you ever want a magic-link flow.
  */
 import { createClient, type SupabaseClient } from '@supabase/supabase-js'
+import { logger } from './logger'
 
 const url = process.env.NEXT_PUBLIC_SUPABASE_URL
 const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
@@ -53,7 +54,7 @@ export async function uploadToBucket(args: {
     upsert: args.upsert ?? true,
   })
   if (error) {
-    console.error('[supabase] upload failed', error)
+    logger.error('supabase.upload_failed', { bucket: args.bucket, path: args.path }, error)
     return null
   }
   const { data } = admin.storage.from(args.bucket).getPublicUrl(args.path)

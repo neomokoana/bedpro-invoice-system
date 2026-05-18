@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { prisma } from '@/lib/prisma'
 import { apiError, requirePermission, ApiError } from '@/lib/api-auth'
+import { audit, clientIp } from '@/lib/audit'
 
 const patchSchema = z.object({
   isActive: z.boolean().optional(),
@@ -22,6 +23,17 @@ export async function PATCH(
     const data =
       id === me.id ? patchSchema.pick({ name: true, branch: true }).parse(body) : patchSchema.parse(body)
     const u = await prisma.user.update({ where: { id }, data, select: { id: true } })
+    // `data.isActive` only exists when this is an admin editing another user;
+    // self-edits run against the picked `{ name?, branch? }` schema.
+    const isDeactivation = 'isActive' in data && data.isActive === false
+    await audit({
+      actor: { id: me.id, email: me.email },
+      action: isDeactivation ? 'user.deactivate' : 'user.update',
+      entityType: 'User',
+      entityId: u.id,
+      ip: clientIp(req),
+      metadata: { changes: data },
+    })
     return NextResponse.json(u)
   } catch (e) {
     return apiError(e)
@@ -29,7 +41,7 @@ export async function PATCH(
 }
 
 export async function DELETE(
-  _req: NextRequest,
+  req: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ) {
   try {
@@ -38,6 +50,13 @@ export async function DELETE(
     if (id === me.id) throw new ApiError(400, 'You cannot delete yourself.')
     // Soft delete via deactivation. Hard delete would break FK on invoices/receipts.
     await prisma.user.update({ where: { id }, data: { isActive: false } })
+    await audit({
+      actor: { id: me.id, email: me.email },
+      action: 'user.deactivate',
+      entityType: 'User',
+      entityId: id,
+      ip: clientIp(req),
+    })
     return NextResponse.json({ ok: true })
   } catch (e) {
     return apiError(e)

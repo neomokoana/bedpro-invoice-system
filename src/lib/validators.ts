@@ -60,16 +60,26 @@ const invoiceCustomerSchema = z.object({
     .or(z.literal('').transform(() => undefined)),
 })
 
-export const invoiceCreateSchema = z.object({
-  customer: invoiceCustomerSchema,
-  issueDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
-  dueDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
-  taxRate: z.number().min(0).max(100).finite(),
-  discount: z.number().min(0).max(100).finite(),
-  notes: z.string().max(2000).optional().nullable(),
-  status: z.enum(['DRAFT', 'UNPAID']),
-  items: z.array(lineItemSchema).min(1).max(200),
-})
+export const invoiceCreateSchema = z
+  .object({
+    customer: invoiceCustomerSchema,
+    issueDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+    dueDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+    taxRate: z.number().min(0).max(100).finite(),
+    discount: z.number().min(0).max(100).finite(),
+    notes: z.string().max(2000).optional().nullable(),
+    status: z.enum(['DRAFT', 'UNPAID']),
+    items: z.array(lineItemSchema).min(1).max(200),
+  })
+  // Both dates are lexicographic-comparable in YYYY-MM-DD format → string
+  // comparison is correct. Reject obviously-broken inputs where due is before
+  // issue (back-dating an already-overdue invoice on purpose is allowed by
+  // setting issueDate in the past — that's fine — but dueDate < issueDate
+  // makes no sense).
+  .refine((d) => d.dueDate >= d.issueDate, {
+    message: 'Due date cannot be before the issue date.',
+    path: ['dueDate'],
+  })
 
 export const invoiceStatusSchema = z.object({
   status: z.enum(['DRAFT', 'UNPAID', 'SENT', 'PAID']),

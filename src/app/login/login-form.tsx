@@ -27,7 +27,6 @@ export function LoginForm({
   const router = useRouter()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
-  const [remember, setRemember] = useState(true)
   const [showPw, setShowPw] = useState(false)
   const [error, setError] = useState<string | null>(initialError ? errorFor(initialError) : null)
   const [loading, setLoading] = useState(false)
@@ -47,7 +46,6 @@ export function LoginForm({
     if (!res) return setError(DEFAULT_ERROR)
     if (res.error) return setError(errorFor(res.error))
 
-    if (!remember) sessionStorage.setItem('bp_session_only', '1')
     router.push(res.url ?? '/dashboard')
     router.refresh()
   }
@@ -102,15 +100,9 @@ export function LoginForm({
         </div>
       </div>
 
-      <label className="flex items-center gap-2 text-sm text-gray-600 select-none">
-        <input
-          type="checkbox"
-          checked={remember}
-          onChange={(e) => setRemember(e.target.checked)}
-          className="rounded border-gray-300 text-[#E8191A] focus:ring-[#E8191A]"
-        />
-        Remember me for 30 days
-      </label>
+      <p className="text-[11px] text-gray-400">
+        Signing in keeps you logged in for 30 days on this device.
+      </p>
 
       <button type="submit" className="bp-btn-primary w-full" disabled={loading}>
         {loading && <Loader2 className="h-4 w-4 animate-spin" />}

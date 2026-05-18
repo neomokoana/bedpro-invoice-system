@@ -98,13 +98,52 @@ Optional:
 
 ```bash
 pnpm install
-cp .env.example .env       # if you don't already have .env
-# Fill in DATABASE_URL, DIRECT_URL, NEXTAUTH_SECRET
+cp .env.example .env       # fill in DATABASE_URL, DIRECT_URL, NEXTAUTH_SECRET (and optionally SMTP_*)
 
-pnpm db:push               # creates tables via DIRECT_URL
+pnpm prisma migrate deploy # applies all migrations in prisma/migrations/
 pnpm db:seed               # creates admin + company settings + products
 pnpm dev                   # → http://localhost:3000
+
+pnpm test                  # vitest unit tests
+pnpm typecheck             # tsc --noEmit
 ```
+
+## Production deployment checklist
+
+This is the order you should follow before flipping a domain at real customers.
+
+### Pre-launch
+- [ ] **Generate a fresh `NEXTAUTH_SECRET` for prod** (`openssl rand -base64 32`). Don't reuse the dev one.
+- [ ] **Set `NEXTAUTH_URL`** to your live domain in Vercel env vars (e.g. `https://invoices.bedpro.org.za`).
+- [ ] **SendGrid (or other SMTP)**: verify a sender, create an API key with `Mail Send` scope, paste as `SMTP_PASSWORD`. Without this, invite emails and customer-invoice emails do nothing.
+- [ ] **Upstash Redis** (optional but recommended): create a database, paste `UPSTASH_REDIS_REST_URL` + `UPSTASH_REDIS_REST_TOKEN`, then swap the stub in `src/lib/rate-limit.ts` for the documented Ratelimit.slidingWindow call. Wire it into `/api/auth/callback/credentials`, `/api/users` POST, `/api/users/[id]/reset`.
+- [ ] **Sentry** (optional): create a Next.js project, paste `SENTRY_DSN`, run `pnpm dlx @sentry/wizard@latest -i nextjs`.
+- [ ] **Vercel function size**: Puppeteer + `@sparticuz/chromium` is ~50MB. Hobby plan is at 50MB; if first deploy errors with size, upgrade to Pro or swap `src/lib/pdf.ts` to `@react-pdf/renderer`.
+
+### Day of launch
+- [ ] **Apply migrations**: `DATABASE_URL=<prod> DIRECT_URL=<prod> pnpm prisma migrate deploy`
+- [ ] **Seed the first admin**: `pnpm db:seed` with `SEED_ADMIN_*` env vars set. Or insert via Supabase SQL editor.
+- [ ] **Verify health**: `curl https://your-domain/api/health` should return `200 { status: 'ok', db: 'ok', smtp: 'configured' }`.
+- [ ] **Smoke test the critical flow**: sign in → create customer → create invoice → mark paid → download PDF → email it to yourself.
+- [ ] **Sign out as admin and verify the lockdown**: try `/users` as STAFF user, expect redirect to `/dashboard`.
+
+### Post-launch (within 24h)
+- [ ] **Verify backups**: Supabase free plan keeps 7 days of daily snapshots; paid plans give point-in-time recovery. Confirm via Dashboard → Database → Backups. Restore to a clone to test the procedure.
+- [ ] **Set up uptime monitoring** against `/api/health` (Better Stack, UptimeRobot — both have free tiers).
+- [ ] **Review the audit_log** table weekly for the first month. Anomalies surface fastest in the first 30 days.
+
+### Security recap (what's in the box)
+- bcrypt cost 12, 5-strike per-account lockout (15 min)
+- Constant-time-ish dummy bcrypt compare on missing-user path (no email enumeration)
+- 30-day JWT, but `requireSession()` re-checks `isActive` on every authenticated API call → deactivation kicks open sessions immediately
+- JWT `update()` is DB-backed, not client-controllable
+- Every API route is Zod-validated and RBAC-gated
+- HTML-escaped invoice/receipt PDF + email templates
+- Atomic invoice/receipt numbering inside the create transaction
+- Server-side totals (client values never trusted)
+- RLS enabled with default-deny on every table — anon JWT can't read anything
+- CSP, X-Frame-Options DENY, HSTS, no-sniff, referrer + permissions policy
+- Append-only `audit_log` for all sensitive mutations
 
 ## Deploy to Vercel
 

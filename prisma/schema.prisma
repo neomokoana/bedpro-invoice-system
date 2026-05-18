@@ -166,6 +166,29 @@ model Receipt {
   @@map("receipts")
 }
 
+// ────────────────────────────────────────────────────────────────
+// AuditLog — append-only record of sensitive mutations.
+// Captures "who did what to which entity, when, from where" for
+// disputes, fraud investigations, and SOC-style compliance.
+// ────────────────────────────────────────────────────────────────
+model AuditLog {
+  id         String   @id @default(cuid())
+  actorId    String?  // null only for system-initiated events
+  actorEmail String?  // denormalised so deleting a user doesn't lose history
+  action     String   // e.g. "invoice.create", "user.deactivate"
+  entityType String?  // e.g. "Invoice", "User", "CompanySettings"
+  entityId   String?
+  ip         String?
+  metadata   Json?    // before/after, payment method, etc.
+  createdAt  DateTime @default(now())
+
+  @@index([action])
+  @@index([entityType, entityId])
+  @@index([actorId])
+  @@index([createdAt])
+  @@map("audit_log")
+}
+
 model CompanySettings {
   id                 String   @id @default("singleton")
   name               String   @default("Bed Pro")

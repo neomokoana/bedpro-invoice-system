@@ -11,6 +11,7 @@
  * to "show temp password" UX.
  */
 import nodemailer, { type Transporter } from 'nodemailer'
+import { logger } from './logger'
 
 let cached: Transporter | null = null
 
@@ -48,7 +49,7 @@ export async function sendMail(args: {
 }): Promise<SendResult> {
   const t = getTransport()
   if (!t) {
-    console.warn('[email] SMTP not configured — skipping send')
+    logger.warn('email.smtp_not_configured', { to: args.to, subject: args.subject })
     return { sent: false, error: 'SMTP not configured' }
   }
   try {
@@ -62,7 +63,7 @@ export async function sendMail(args: {
     })
     return { sent: true, messageId: info.messageId }
   } catch (err) {
-    console.error('[email] send failed', err)
+    logger.error('email.send_failed', { to: args.to, subject: args.subject }, err)
     return { sent: false, error: err instanceof Error ? err.message : 'send failed' }
   }
 }
@@ -96,17 +97,29 @@ function escUrl(s: string | null | undefined): string {
   return esc(v)
 }
 
-function emailShell(content: string): string {
+/**
+ * Render the brand header. If we have a public https logo URL we use it; the
+ * CSS text fallback covers data: URLs (which Gmail/Outlook strip) and the
+ * "no logo set" case.
+ */
+function brandHeader(logoUrl: string | null | undefined): string {
+  if (logoUrl && /^https?:\/\//i.test(logoUrl)) {
+    return `<img src="${esc(logoUrl)}" alt="Bed Pro" style="height:32px;width:auto;display:block;" />`
+  }
+  return `<span style="font-size:24px;font-weight:800;letter-spacing:-1px;"><span style="color:${RED};">Bed</span><span style="color:#111;">Pro</span></span>`
+}
+
+function emailShell(content: string, logoUrl?: string | null): string {
   return `<!doctype html><html><body style="margin:0;padding:0;background:#f6f6f6;font-family:'DM Sans',system-ui,sans-serif;color:#111;">
     <table width="100%" cellpadding="0" cellspacing="0" style="background:#f6f6f6;">
       <tr><td align="center" style="padding:24px;">
         <table width="600" cellpadding="0" cellspacing="0" style="background:#fff;border-radius:12px;overflow:hidden;border:1px solid #eee;">
           <tr><td style="padding:24px 28px;border-bottom:3px solid ${RED};">
-            <span style="font-size:24px;font-weight:800;letter-spacing:-1px;"><span style="color:${RED};">Bed</span><span style="color:#111;">Pro</span></span>
+            ${brandHeader(logoUrl)}
           </td></tr>
           <tr><td style="padding:28px;">${content}</td></tr>
           <tr><td style="padding:18px 28px;border-top:1px solid #eee;font-size:11px;color:#999;">
-            Bed Pro · Pretoria, South Africa
+            Bed Pro · Pretoria, South Africa · www.bedpro.org.za
           </td></tr>
         </table>
       </td></tr>
@@ -121,8 +134,10 @@ export function invoiceEmailHtml(args: {
   dueDate: string
   companyName: string
   notes?: string | null
+  logoUrl?: string | null
 }): string {
-  return emailShell(`
+  return emailShell(
+    `
     <p style="margin:0 0 12px;font-size:14px;">Hi ${esc(args.customerName)},</p>
     <p style="margin:0 0 12px;font-size:14px;line-height:1.5;">
       Please find your invoice <strong>${esc(args.invoiceNumber)}</strong> attached as a PDF.
@@ -136,7 +151,9 @@ export function invoiceEmailHtml(args: {
     </table>
     ${args.notes ? `<p style="margin:0 0 12px;font-size:13px;color:#666;">${esc(args.notes)}</p>` : ''}
     <p style="margin:18px 0 0;font-size:13px;color:#666;">Thanks,<br/>${esc(args.companyName)}</p>
-  `)
+  `,
+    args.logoUrl,
+  )
 }
 
 export function inviteEmailHtml(args: {
@@ -144,8 +161,10 @@ export function inviteEmailHtml(args: {
   tempPassword: string
   loginUrl: string
   role: string
+  logoUrl?: string | null
 }): string {
-  return emailShell(`
+  return emailShell(
+    `
     <p style="margin:0 0 12px;font-size:14px;">Hi ${esc(args.name)},</p>
     <p style="margin:0 0 12px;font-size:14px;line-height:1.5;">
       An account has been created for you on the Bed Pro Invoice System with the <strong>${esc(args.role)}</strong> role.
@@ -156,5 +175,7 @@ export function inviteEmailHtml(args: {
       <a href="${escUrl(args.loginUrl)}" style="background:${RED};color:#fff;text-decoration:none;padding:10px 18px;border-radius:8px;font-weight:700;display:inline-block;">Sign in</a>
     </p>
     <p style="margin:18px 0 0;font-size:11px;color:#999;">If you weren&apos;t expecting this, please ignore the email.</p>
-  `)
+  `,
+    args.logoUrl,
+  )
 }

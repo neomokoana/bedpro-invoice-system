@@ -4,6 +4,7 @@ import { apiError, requireSession, ApiError } from '@/lib/api-auth'
 import { can } from '@/lib/permissions'
 import { invoiceStatusSchema } from '@/lib/validators'
 import { nextReceiptNumber } from '@/lib/numbering'
+import { audit, clientIp } from '@/lib/audit'
 
 export async function PATCH(
   req: NextRequest,
@@ -56,6 +57,20 @@ export async function PATCH(
       }
 
       return updated
+    })
+
+    await audit({
+      actor: { id: user.id, email: user.email },
+      action: status === 'PAID' ? 'invoice.mark_paid' : 'invoice.change_status',
+      entityType: 'Invoice',
+      entityId: result.id,
+      ip: clientIp(req),
+      metadata: {
+        from: result.status === status ? 'unchanged' : undefined,
+        to: status,
+        paymentMethod: paymentMethod ?? null,
+        paymentReference: paymentReference ?? null,
+      },
     })
 
     return NextResponse.json({ id: result.id, status: result.status })
