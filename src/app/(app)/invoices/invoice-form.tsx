@@ -138,6 +138,18 @@ export function InvoiceForm({
 
     // 1. Always save first. Drafts use DRAFT; everything else uses UNPAID.
     const status = action === 'draft' ? 'DRAFT' : 'UNPAID'
+
+    // Coerce each line into the exact shape the API expects so a cleared input
+    // (qty === "") or a stray decimal can't trip the Zod int().positive() check.
+    const items = lines
+      .filter((l) => l.description.trim())
+      .map((l) => ({
+        productId: l.productId,
+        description: l.description.trim(),
+        qty: Math.max(1, Math.floor(Number(l.qty) || 1)),
+        unitPrice: Math.max(0, Number(l.unitPrice) || 0),
+      }))
+
     const saveRes = await fetch('/api/invoices', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
@@ -145,28 +157,28 @@ export function InvoiceForm({
         customer: customerPayload,
         issueDate,
         dueDate,
-        taxRate: Number(taxRate),
-        discount: Number(discount),
+        taxRate: Math.max(0, Number(taxRate) || 0),
+        discount: Math.max(0, Number(discount) || 0),
         notes,
         status,
-        items: lines
-          .filter((l) => l.description.trim())
-          .map((l) => ({
-            productId: l.productId,
-            description: l.description.trim(),
-            qty: Number(l.qty),
-            unitPrice: Number(l.unitPrice),
-          })),
+        items,
       }),
     })
 
     if (!saveRes.ok) {
       setSubmitting(false)
       setActiveAction(null)
-      const { error: msg } = await saveRes
-        .json()
-        .catch(() => ({ error: 'Could not save invoice.' }))
-      return setError(msg ?? 'Could not save invoice.')
+      const body = await saveRes.json().catch(() => null)
+      if (body?.issues && typeof body.issues === 'object') {
+        // Surface the first field-level message — e.g. "dueDate: Due date
+        // cannot be before the issue date." or "items: required" etc.
+        const first = Object.entries(body.issues).find(([, v]) => Array.isArray(v) && v.length > 0)
+        if (first) {
+          const [field, messages] = first as [string, string[]]
+          return setError(`${field}: ${messages[0]}`)
+        }
+      }
+      return setError(body?.error ?? 'Could not save invoice.')
     }
     const { id } = await saveRes.json()
 
@@ -378,6 +390,12 @@ export function InvoiceForm({
                         // AND keyboard input both stay whole-number-only.
                         const onlyDigits = e.target.value.replace(/\D/g, '')
                         updateLine(i, { qty: onlyDigits })
+                      }}
+                      onBlur={() => {
+                        // Empty / "0" → snap back to "1" so the row is always
+                        // valid by the time the user clicks Save.
+                        const n = parseInt(line.qty, 10)
+                        if (!Number.isFinite(n) || n < 1) updateLine(i, { qty: '1' })
                       }}
                       className="bp-input text-right"
                     />
