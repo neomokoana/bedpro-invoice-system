@@ -74,6 +74,24 @@ describe('invoiceCreateSchema', () => {
   it('rejects taxRate > 100', () => {
     expect(() => invoiceCreateSchema.parse({ ...goodBody, taxRate: 101 })).toThrow()
   })
+
+  it('rejects fractional line-item quantities', () => {
+    expect(() =>
+      invoiceCreateSchema.parse({
+        ...goodBody,
+        items: [{ productId: null, description: 'Bed', qty: 1.5, unitPrice: 1000 }],
+      }),
+    ).toThrow()
+  })
+
+  it('rejects zero or negative quantities', () => {
+    expect(() =>
+      invoiceCreateSchema.parse({
+        ...goodBody,
+        items: [{ productId: null, description: 'Bed', qty: 0, unitPrice: 1000 }],
+      }),
+    ).toThrow()
+  })
 })
 
 describe('passwordChangeSchema', () => {

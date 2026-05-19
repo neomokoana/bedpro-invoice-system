@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { Plus, Trash2, Loader2, UserPlus, Users } from 'lucide-react'
+import { Plus, Trash2, Loader2, UserPlus, Users, Mail, Printer, FileEdit, Check } from 'lucide-react'
 import { calcTotals } from '@/lib/totals'
 import { formatMoney, todayStr, addDaysStr } from '@/lib/format'
 import { cn } from '@/lib/cn'
@@ -24,14 +24,27 @@ type Line = {
 }
 type CustomerMode = 'existing' | 'new'
 
+/**
+ * Submit actions:
+ *  - 'draft'    → save as DRAFT, navigate to the invoice page
+ *  - 'unpaid'   → save as UNPAID (finalised), navigate to the invoice page
+ *  - 'send'     → save as UNPAID, email PDF to the customer, navigate
+ *                  (the email API bumps status to SENT on success)
+ *  - 'print'    → save as UNPAID, open the PDF in a new tab for printing,
+ *                  navigate to the invoice page
+ */
+type SubmitAction = 'draft' | 'unpaid' | 'send' | 'print'
+
 export function InvoiceForm({
   customers,
   products,
   defaultTaxRate,
+  canSendEmail,
 }: {
   customers: Customer[]
   products: Product[]
   defaultTaxRate: number
+  canSendEmail: boolean
 }) {
   const router = useRouter()
   const [customerMode, setCustomerMode] = useState<CustomerMode>(
@@ -75,7 +88,9 @@ export function InvoiceForm({
     updateLine(i, { productId: p.id, description: p.name, unitPrice: String(p.unitPrice) })
   }
 
-  async function submit(status: 'DRAFT' | 'UNPAID') {
+  const [activeAction, setActiveAction] = useState<SubmitAction | null>(null)
+
+  async function submit(action: SubmitAction) {
     setError(null)
 
     // Build the customer payload based on which mode the form is in.
@@ -104,8 +119,26 @@ export function InvoiceForm({
     if (!lines.length || lines.every((l) => !l.description.trim()))
       return setError('Add at least one line item.')
 
+    // 'send' requires a customer email. Catch it before saving so we don't
+    // create an invoice that immediately fails to email.
+    if (action === 'send') {
+      const recipientEmail =
+        customerMode === 'existing'
+          ? customers.find((c) => c.id === customerId)?.email
+          : newCustomer.email.trim()
+      if (!recipientEmail) {
+        return setError(
+          'This customer has no email on file. Add an email before sending — or use Save & Finalise instead.',
+        )
+      }
+    }
+
     setSubmitting(true)
-    const res = await fetch('/api/invoices', {
+    setActiveAction(action)
+
+    // 1. Always save first. Drafts use DRAFT; everything else uses UNPAID.
+    const status = action === 'draft' ? 'DRAFT' : 'UNPAID'
+    const saveRes = await fetch('/api/invoices', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({
@@ -126,13 +159,35 @@ export function InvoiceForm({
           })),
       }),
     })
-    setSubmitting(false)
 
-    if (!res.ok) {
-      const { error: msg } = await res.json().catch(() => ({ error: 'Could not save invoice.' }))
+    if (!saveRes.ok) {
+      setSubmitting(false)
+      setActiveAction(null)
+      const { error: msg } = await saveRes
+        .json()
+        .catch(() => ({ error: 'Could not save invoice.' }))
       return setError(msg ?? 'Could not save invoice.')
     }
-    const { id } = await res.json()
+    const { id } = await saveRes.json()
+
+    // 2. Action-specific follow-up.
+    if (action === 'send') {
+      const sendRes = await fetch(`/api/invoices/${id}/email`, { method: 'POST' })
+      if (!sendRes.ok) {
+        const { error: msg } = await sendRes
+          .json()
+          .catch(() => ({ error: 'Email could not be sent.' }))
+        // Invoice was saved — navigate to it so the user can retry from there.
+        alert(`Invoice saved, but the email failed: ${msg}\nYou can retry from the invoice page.`)
+      }
+    } else if (action === 'print') {
+      // Open the PDF inline in a new tab. The browser's PDF viewer ships with
+      // its own print button; the user hits Ctrl+P / Cmd+P there.
+      window.open(`/api/invoices/${id}/pdf?disposition=inline`, '_blank', 'noopener')
+    }
+
+    setSubmitting(false)
+    setActiveAction(null)
     router.push(`/invoices/${id}`)
     router.refresh()
   }
@@ -315,10 +370,15 @@ export function InvoiceForm({
                   <td>
                     <input
                       type="number"
-                      min="0"
-                      step="0.01"
+                      min="1"
+                      step="1"
                       value={line.qty}
-                      onChange={(e) => updateLine(i, { qty: e.target.value })}
+                      onChange={(e) => {
+                        // Strip anything that isn't a digit so the up/down arrows
+                        // AND keyboard input both stay whole-number-only.
+                        const onlyDigits = e.target.value.replace(/\D/g, '')
+                        updateLine(i, { qty: onlyDigits })
+                      }}
                       className="bp-input text-right"
                     />
                   </td>
@@ -415,15 +475,66 @@ export function InvoiceForm({
         </div>
       </div>
 
-      <div className="flex justify-end gap-2">
-        <button type="button" onClick={() => submit('DRAFT')} disabled={submitting} className="bp-btn-outline">
-          {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+      <div className="flex justify-end gap-2 flex-wrap">
+        <button
+          type="button"
+          onClick={() => submit('draft')}
+          disabled={submitting}
+          className="bp-btn-outline"
+        >
+          {activeAction === 'draft' ? (
+            <Loader2 className="h-4 w-4 animate-spin" />
+          ) : (
+            <FileEdit className="h-4 w-4" />
+          )}
           Save as Draft
         </button>
-        <button type="button" onClick={() => submit('UNPAID')} disabled={submitting} className="bp-btn-primary">
-          {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
-          Save & Finalise
+
+        <button
+          type="button"
+          onClick={() => submit('unpaid')}
+          disabled={submitting}
+          className="bp-btn-dark"
+        >
+          {activeAction === 'unpaid' ? (
+            <Loader2 className="h-4 w-4 animate-spin" />
+          ) : (
+            <Check className="h-4 w-4" />
+          )}
+          Save &amp; Finalise
         </button>
+
+        <button
+          type="button"
+          onClick={() => submit('print')}
+          disabled={submitting}
+          className="bp-btn-outline"
+          title="Save the invoice and open the PDF for printing"
+        >
+          {activeAction === 'print' ? (
+            <Loader2 className="h-4 w-4 animate-spin" />
+          ) : (
+            <Printer className="h-4 w-4" />
+          )}
+          Save &amp; Print
+        </button>
+
+        {canSendEmail && (
+          <button
+            type="button"
+            onClick={() => submit('send')}
+            disabled={submitting}
+            className="bp-btn-primary"
+            title="Save the invoice and email a PDF copy to the customer"
+          >
+            {activeAction === 'send' ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <Mail className="h-4 w-4" />
+            )}
+            Save &amp; Send to customer
+          </button>
+        )}
       </div>
     </div>
   )

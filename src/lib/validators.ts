@@ -24,7 +24,10 @@ export const productSchema = z.object({
 const lineItemSchema = z.object({
   productId: z.string().cuid().nullable(),
   description: z.string().min(1).max(500).trim(),
-  qty: z.number().positive().finite().max(100_000),
+  // Whole units only — beds/mattresses/etc. don't come in fractional quantities.
+  // The DB column is Decimal(10,2) for future flexibility, but the API rejects
+  // anything non-integer.
+  qty: z.number().int().positive().max(100_000),
   unitPrice: z.number().nonnegative().finite().max(10_000_000),
 })
 
