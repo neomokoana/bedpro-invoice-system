@@ -1,4 +1,6 @@
-import type { Role } from '@prisma/client'
+// Use the edge-safe Role from src/lib/roles instead of @prisma/client.
+// next-auth.d.ts is transitively reachable from the middleware bundle.
+import type { Role } from '@/lib/roles'
 import 'next-auth'
 import 'next-auth/jwt'
 

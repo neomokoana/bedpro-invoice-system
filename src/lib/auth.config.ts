@@ -7,7 +7,7 @@
  */
 import type { NextAuthConfig } from 'next-auth'
 import { canAccessPath } from './permissions'
-import type { Role } from '@prisma/client'
+import type { Role } from './roles'
 
 export const authConfig = {
   session: {

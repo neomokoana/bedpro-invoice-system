@@ -5,7 +5,7 @@
  *   MANAGER — all invoices/customers/products, no user management
  *   STAFF   — create invoices only (and view their own); no delete, no settings
  */
-import type { Role } from '@prisma/client'
+import type { Role } from './roles'
 
 export const ROLE_RANK: Record<Role, number> = {
   ADMIN: 3,
