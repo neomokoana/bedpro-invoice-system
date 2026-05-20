@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { apiError, requirePermission, ApiError } from '@/lib/api-auth'
-import { renderInvoiceHtml } from '@/lib/invoice-html'
+import { InvoiceDocument } from '@/lib/invoice-pdf'
 import { renderPdf } from '@/lib/pdf'
 import { sendMail, invoiceEmailHtml } from '@/lib/email'
 import { formatMoney, formatDate } from '@/lib/format'
@@ -28,7 +28,7 @@ export async function POST(
     if (!invoice.customer.email) throw new ApiError(400, 'Customer has no email on file')
     if (!company) throw new ApiError(500, 'Company settings missing')
 
-    const pdf = await renderPdf(renderInvoiceHtml(invoice, company))
+    const pdf = await renderPdf(InvoiceDocument({ invoice, company }))
 
     const result = await sendMail({
       to: invoice.customer.email,

@@ -13,9 +13,6 @@ const nextConfig = {
   // Native modules used server-side only — keep them out of the bundle.
   // In Next 15+ this is at the top level (not under `experimental`).
   serverExternalPackages: [
-    '@sparticuz/chromium',
-    'puppeteer-core',
-    'puppeteer',
     '@prisma/client',
     '@prisma/adapter-pg',
     'pg',

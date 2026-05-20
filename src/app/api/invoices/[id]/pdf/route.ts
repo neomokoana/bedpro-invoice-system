@@ -2,12 +2,10 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { apiError, requireSession, ApiError } from '@/lib/api-auth'
 import { can } from '@/lib/permissions'
-import { renderInvoiceHtml } from '@/lib/invoice-html'
+import { InvoiceDocument } from '@/lib/invoice-pdf'
 import { renderPdf } from '@/lib/pdf'
 
-// Puppeteer needs the Node.js runtime, not Edge.
 export const runtime = 'nodejs'
-// 60s gives chromium enough time on cold-start Vercel functions.
 export const maxDuration = 60
 
 export async function GET(
@@ -31,8 +29,7 @@ export async function GET(
     }
     if (!company) throw new ApiError(500, 'Company settings missing')
 
-    const html = renderInvoiceHtml(invoice, company)
-    const pdf = await renderPdf(html)
+    const pdf = await renderPdf(InvoiceDocument({ invoice, company }))
 
     const disposition =
       req.nextUrl.searchParams.get('disposition') === 'inline'

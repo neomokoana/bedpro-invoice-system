@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { apiError, requireSession, ApiError } from '@/lib/api-auth'
 import { can } from '@/lib/permissions'
-import { renderReceiptHtml } from '@/lib/invoice-html'
+import { ReceiptDocument } from '@/lib/invoice-pdf'
 import { renderPdf } from '@/lib/pdf'
 
 export const runtime = 'nodejs'
@@ -27,8 +27,7 @@ export async function GET(
     if (!receipt) throw new ApiError(404, 'Not found')
     if (!company) throw new ApiError(500, 'Company settings missing')
 
-    const html = renderReceiptHtml(receipt, company)
-    const pdf = await renderPdf(html)
+    const pdf = await renderPdf(ReceiptDocument({ receipt, company }))
 
     return new NextResponse(new Blob([pdf], { type: 'application/pdf' }), {
       status: 200,
