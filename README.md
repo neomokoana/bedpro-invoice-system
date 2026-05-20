@@ -210,3 +210,4 @@ prisma/
 - RLS-disabled tables locked behind `postgres` role (anon JWT can't reach them)
 - `next.config.js` sets `X-Frame-Options: DENY`, `X-Content-Type-Options: nosniff`, `Referrer-Policy`, `Permissions-Policy`
 - No public registration — admin invites only
+
