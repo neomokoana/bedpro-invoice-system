@@ -22,7 +22,10 @@ export const productSchema = z.object({
 })
 
 const lineItemSchema = z.object({
-  productId: z.string().cuid().nullable(),
+  // Just a non-empty string up to 100 chars — NOT a CUID check. Seeded
+  // products use readable IDs like "seed-king-size-bed-frame"; Prisma's
+  // foreign-key constraint catches anything that isn't a real product.
+  productId: z.string().min(1).max(100).nullable(),
   description: z.string().min(1).max(500).trim(),
   // Whole units only — beds/mattresses/etc. don't come in fractional quantities.
   // The DB column is Decimal(10,2) for future flexibility, but the API rejects
@@ -41,7 +44,9 @@ const lineItemSchema = z.object({
  * optional — address in particular is only needed when delivering.
  */
 const invoiceCustomerSchema = z.object({
-  id: z.string().cuid().optional(),
+  // Same reasoning as productId — accept any ID Prisma might have assigned
+  // (cuid is the default, but the schema doesn't *require* the format).
+  id: z.string().min(1).max(100).optional(),
   name: z.string().min(1).max(200).trim(),
   phone: z
     .string()

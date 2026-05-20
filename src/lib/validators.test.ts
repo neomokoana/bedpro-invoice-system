@@ -92,6 +92,29 @@ describe('invoiceCreateSchema', () => {
       }),
     ).toThrow()
   })
+
+  // Seeded products use readable IDs ("seed-king-size-bed-frame") instead of
+  // CUIDs. The schema must accept those, otherwise picking a seeded product
+  // from the dropdown breaks invoice creation.
+  it('accepts non-CUID product IDs (seeded products use readable strings)', () => {
+    expect(() =>
+      invoiceCreateSchema.parse({
+        ...goodBody,
+        items: [
+          { productId: 'seed-king-size-bed-frame', description: 'King Bed', qty: 1, unitPrice: 4999 },
+        ],
+      }),
+    ).not.toThrow()
+  })
+
+  it('accepts non-CUID customer IDs', () => {
+    expect(() =>
+      invoiceCreateSchema.parse({
+        ...goodBody,
+        customer: { id: 'imported-customer-001', name: 'Themba' },
+      }),
+    ).not.toThrow()
+  })
 })
 
 describe('passwordChangeSchema', () => {
