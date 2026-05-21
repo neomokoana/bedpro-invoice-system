@@ -71,7 +71,7 @@ export function LoginForm({
           value={email}
           onChange={(e) => setEmail(e.target.value)}
           className="bp-input"
-          placeholder="you@bedpro.co.za"
+          placeholder="you@bedpro.org.za"
         />
       </div>
 

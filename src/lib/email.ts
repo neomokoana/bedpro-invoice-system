@@ -5,7 +5,7 @@
  *   SMTP_PORT=587
  *   SMTP_USER=apikey
  *   SMTP_PASSWORD=<SendGrid API key>     # or SMTP_PASS — both accepted
- *   EMAIL_FROM="Bed Pro <invoices@bedpro.co.za>"   # or SMTP_FROM
+ *   EMAIL_FROM="Bed Pro <invoices@bedpro.org.za>"  # or SMTP_FROM
  *
  * If env is missing, sendMail returns { sent: false } so callers can fall back
  * to "show temp password" UX.
@@ -54,7 +54,7 @@ export async function sendMail(args: {
   }
   try {
     const info = await t.sendMail({
-      from: process.env.EMAIL_FROM ?? process.env.SMTP_FROM ?? 'Bed Pro <no-reply@bedpro.co.za>',
+      from: process.env.EMAIL_FROM ?? process.env.SMTP_FROM ?? 'Bed Pro <no-reply@bedpro.org.za>',
       to: args.to,
       subject: args.subject,
       html: args.html,

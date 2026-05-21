@@ -41,7 +41,7 @@ async function main() {
       legalName: 'Bed Pro (Pty) Ltd',
       address: '47 Furniture Avenue, Pretoria, Gauteng, 0001',
       phone: '012 345 6789',
-      email: 'info@bedpro.co.za',
+      email: 'info@bedpro.org.za',
       vatNumber: '4130456789',
       currency: 'ZAR',
       taxRate: 15,
