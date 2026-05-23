@@ -43,6 +43,25 @@ export function SettingsForm({ initial }: { initial: Initial }) {
   const [saved, setSaved] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
+  // Maps API field keys (camelCase) to the human-readable labels users see
+  // in the form. Used to translate Zod `issues` into a useful error message.
+  const FIELD_LABELS: Record<string, string> = {
+    name: 'Display name',
+    legalName: 'Legal name',
+    address: 'Address',
+    phone: 'Phone',
+    email: 'Email',
+    website: 'Website',
+    vatNumber: 'VAT number',
+    registrationNumber: 'Registration #',
+    logoUrl: 'Logo',
+    taxRate: 'Default VAT %',
+    bankName: 'Bank',
+    bankBranch: 'Branch',
+    bankAccountName: 'Account name',
+    bankAccountNumber: 'Account number',
+  }
+
   async function submit(e: React.FormEvent) {
     e.preventDefault()
     setError(null)
@@ -55,8 +74,23 @@ export function SettingsForm({ initial }: { initial: Initial }) {
     })
     setSaving(false)
     if (!res.ok) {
-      const { error: msg } = await res.json().catch(() => ({ error: 'Failed to save' }))
-      return setError(msg)
+      const body = (await res.json().catch(() => ({}))) as {
+        error?: string
+        issues?: Record<string, string[]>
+      }
+      // Zod errors from the API include per-field issues. Translate them to
+      // "Field name: reason" lines so the user knows which input to fix —
+      // a plain "Invalid input" toast leaves them guessing.
+      if (body.issues && Object.keys(body.issues).length > 0) {
+        const lines = Object.entries(body.issues)
+          .filter(([, errs]) => errs && errs.length > 0)
+          .map(
+            ([field, errs]) =>
+              `${FIELD_LABELS[field] ?? field}: ${errs.join('; ')}`,
+          )
+        return setError(lines.join('\n'))
+      }
+      return setError(body.error ?? 'Failed to save')
     }
     setSaved(true)
     router.refresh()
@@ -83,7 +117,11 @@ export function SettingsForm({ initial }: { initial: Initial }) {
 
   return (
     <form onSubmit={submit} className="space-y-6">
-      {error && <div className="rounded-lg border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-700">{error}</div>}
+      {error && (
+        <div className="rounded-lg border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-700 whitespace-pre-line">
+          {error}
+        </div>
+      )}
       {saved && (
         <div className="rounded-lg border border-emerald-300 bg-emerald-50 px-3 py-2 text-sm text-emerald-700 flex items-center gap-2">
           <CheckCircle2 className="h-4 w-4" /> Settings saved.

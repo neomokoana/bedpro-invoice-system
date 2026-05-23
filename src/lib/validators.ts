@@ -1,5 +1,35 @@
 import { z } from 'zod'
 
+/**
+ * Best-effort URL normalisation for user-typed website fields.
+ *
+ * Lets users type any of:
+ *   - "www.bedpro.org.za"        → "https://www.bedpro.org.za"
+ *   - "bedpro.org.za"            → "https://bedpro.org.za"
+ *   - "https://bedpro.org.za"    → unchanged
+ *   - ""                         → "" (caller turns into null)
+ *
+ * Without this, `z.string().url()` rejects bare domains and the form
+ * fails with a generic 400 on save — confusing because the field looks
+ * filled in. Empty strings pass through so the API can normalise them
+ * to NULL in the database.
+ */
+function normaliseUrl(v: string): string {
+  const trimmed = v.trim()
+  if (trimmed === '') return ''
+  return /^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`
+}
+
+function isValidHttpUrl(v: string): boolean {
+  if (v === '') return true
+  try {
+    const u = new URL(v)
+    return u.protocol === 'http:' || u.protocol === 'https:'
+  } catch {
+    return false
+  }
+}
+
 export const customerSchema = z.object({
   name: z.string().min(1).max(200).trim(),
   company: z.string().max(200).trim().optional().nullable(),
@@ -113,7 +143,12 @@ export const settingsSchema = z.object({
   address: z.string().max(500).optional(),
   phone: z.string().max(50).optional(),
   email: z.string().email().max(200).optional().or(z.literal('')),
-  website: z.string().url().max(200).optional().or(z.literal('')),
+  website: z
+    .string()
+    .max(200)
+    .transform(normaliseUrl)
+    .refine(isValidHttpUrl, 'Enter a valid website (e.g. www.example.com).')
+    .optional(),
   vatNumber: z.string().max(50).optional(),
   registrationNumber: z.string().max(50).optional(),
   // Accept either a regular http(s) URL or a `data:` URL (base64-embedded image).

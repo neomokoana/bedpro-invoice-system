@@ -157,4 +157,24 @@ describe('settingsSchema', () => {
       settingsSchema.parse({ ...base, logoUrl: 'data:text/html,<script>' }),
     ).toThrow()
   })
+
+  it('auto-prepends https:// to bare-domain websites', () => {
+    const out = settingsSchema.parse({ ...base, website: 'www.bedpro.org.za' })
+    expect(out.website).toBe('https://www.bedpro.org.za')
+  })
+
+  it('leaves fully-qualified websites alone', () => {
+    const out = settingsSchema.parse({ ...base, website: 'https://bedpro.org.za' })
+    expect(out.website).toBe('https://bedpro.org.za')
+  })
+
+  it('accepts an empty website (cleared field)', () => {
+    expect(() => settingsSchema.parse({ ...base, website: '' })).not.toThrow()
+  })
+
+  it('rejects an obviously broken website like "not a url at all"', () => {
+    expect(() =>
+      settingsSchema.parse({ ...base, website: 'not a url at all' }),
+    ).toThrow()
+  })
 })
